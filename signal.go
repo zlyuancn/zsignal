@@ -24,7 +24,7 @@ type Signal struct {
 }
 
 func (m *Signal) start() {
-    go m.once.Do(func() {
+    m.once.Do(func() {
         c := make(chan os.Signal, 1)
         signal.Notify(c,
             os.Kill,
@@ -33,10 +33,13 @@ func (m *Signal) start() {
             syscall.SIGKILL,
             syscall.SIGTERM,
         )
-        select {
-        case <-c:
-            m.Shutdown()
-        }
+
+        go func() {
+            select {
+            case <-c:
+                m.Shutdown()
+            }
+        }()
     })
 }
 
