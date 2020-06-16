@@ -21,6 +21,7 @@ type Signal struct {
     onShutdownFns []func()
     mx            sync.Mutex
     once          sync.Once
+    wg            sync.WaitGroup
 }
 
 func (m *Signal) start() {
@@ -52,6 +53,7 @@ func (m *Signal) Register(fn func()) {
     m.start()
 
     m.mx.Lock()
+    m.wg.Add(1)
     m.onShutdownFns = append(m.onShutdownFns, fn)
     m.mx.Unlock()
 }
@@ -63,8 +65,21 @@ func (m *Signal) Shutdown() {
 
     for _, fn := range m.onShutdownFns {
         fn()
+        m.wg.Done()
     }
     m.onShutdownFns = nil
+}
+
+// 等待直到Shutdown调用结束
+func (m *Signal) Wait() {
+    m.start()
+
+    m.mx.Lock()
+    m.wg.Add(1)
+    m.onShutdownFns = append(m.onShutdownFns, func() {})
+    m.mx.Unlock()
+
+    m.wg.Wait()
 }
 
 // 立即执行所有注册的函数
@@ -75,4 +90,9 @@ func Shutdown() {
 // 注册一个函数, 在程序退出或收到退出信号时会调用它
 func RegisterOnShutdown(fn func()) {
     DefaultSignal.Register(fn)
+}
+
+// 等待直到Shutdown调用结束
+func Wait() {
+    DefaultSignal.Wait()
 }
